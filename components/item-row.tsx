@@ -315,6 +315,17 @@ export function ItemRow({ item }: { item: Item }) {
                 </svg>
                 Скачать видео
               </a>
+              <a
+                href={item.site_url}
+                download={item.site_filename}
+                className="w-full text-left px-3 py-2 text-sm text-neutral-300 hover:bg-white/5 rounded-md flex items-center gap-2"
+                role="menuitem"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                </svg>
+                Скачать архив
+              </a>
               <div className="h-px bg-white/5 my-1" />
               <button
                 type="button"
