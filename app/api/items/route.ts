@@ -47,8 +47,13 @@ export async function POST(req: Request) {
   if (!isOurBlobUrl(body.site_url)) return badRequest("site_url must be from our blob store");
   if (!isOurBlobUrl(body.video_url)) return badRequest("video_url must be from our blob store");
   if (!isOurBlobUrl(body.image_url)) return badRequest("image_url must be from our blob store");
-  if (body.play_url != null && !isOurBlobUrl(body.play_url))
-    return badRequest("play_url must be from our blob store");
+  // play_url is now a relative path served by our /play/[...path] proxy.
+  if (
+    body.play_url != null &&
+    !(typeof body.play_url === "string" && /^\/play\/[0-9a-f]{16}\/index\.html$/i.test(body.play_url))
+  ) {
+    return badRequest("play_url must be /play/<slug>/index.html");
+  }
 
   const site_filename = asStr(body.site_filename, 500) ?? "site.zip";
   const video_filename = asStr(body.video_filename, 500) ?? "video.mp4";

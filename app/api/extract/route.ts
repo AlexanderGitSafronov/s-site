@@ -15,13 +15,12 @@ const MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024; // 1 GB (zip bomb defense)
 function isUnsafePath(p: string): boolean {
   if (!p || p.startsWith("/") || p.startsWith("\\")) return true;
   if (p.includes("..")) return true;
-  if (/^[a-zA-Z]:[\\/]/.test(p)) return true; // Windows drive
+  if (/^[a-zA-Z]:[\\/]/.test(p)) return true;
   if (p.includes("\0")) return true;
   return false;
 }
 
 function isJunkPath(p: string): boolean {
-  // macOS resource forks, .DS_Store; Windows thumbs; common junk metadata
   if (p.startsWith("__MACOSX/") || p.includes("/__MACOSX/")) return true;
   const base = p.split("/").pop() ?? "";
   if (base === ".DS_Store" || base === "Thumbs.db") return true;
@@ -88,42 +87,39 @@ export async function POST(req: Request) {
       ? [...firstSegments][0] + "/"
       : "";
 
-  // Server-generated slug — client cannot influence where files land.
   const slug = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   const prefix = `play/${slug}/`;
-  let indexUrl: string | null = null;
+  let indexFound = false;
 
   try {
     await Promise.all(
       paths.map(async (raw) => {
         const rel = stripRoot ? raw.slice(stripRoot.length) : raw;
-        if (!rel || isUnsafePath(rel)) return;
+        if (!rel || isUnsafePath(rel) || isJunkPath(rel)) return;
         const pathname = prefix + rel;
-        const result = await put(pathname, Buffer.from(entries[raw]), {
+        await put(pathname, Buffer.from(entries[raw]), {
           access: "public",
           contentType: mimeFor(rel),
-          // Inline so the browser renders HTML/JS/WASM/images instead of
-          // forcing a download (Vercel Blob defaults to attachment).
-          contentDisposition: `inline; filename="${encodeURIComponent(rel.split("/").pop() ?? "file")}"`,
           addRandomSuffix: false,
           allowOverwrite: false,
         });
         const lower = rel.toLowerCase();
-        if (lower === "index.html" || lower === "index.htm") {
-          indexUrl = result.url;
-        }
+        if (lower === "index.html" || lower === "index.htm") indexFound = true;
       }),
     );
   } catch (e) {
     return serverError(`upload failed: ${(e as Error).message}`);
   }
 
-  if (!indexUrl) {
+  if (!indexFound) {
     return badRequest("index.html not found at the root of the archive");
   }
 
+  // Return a relative URL to OUR proxy, not the direct Blob URL.
+  // The proxy strips the bad Content-Disposition: attachment and CSP that
+  // Vercel Blob defaults to, so HTML/JS/WASM run in the browser.
   return NextResponse.json({
-    playUrl: indexUrl,
+    playUrl: `/play/${slug}/index.html`,
     playPrefix: prefix,
     fileCount: paths.length,
     totalBytes: totalUncompressed,

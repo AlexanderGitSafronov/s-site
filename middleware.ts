@@ -17,7 +17,7 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next();
       }
     } catch {
-      // env not configured → fall through to 401/redirect
+      // env misconfigured → fall through to redirect/401
     }
   }
 
@@ -31,6 +31,11 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(url);
 }
 
+// Match everything except Next internals and well-known static assets.
+// Note: /play/* and /icon.svg/etc are explicit excludes; everything else
+// (including paths with dots like /play/abc/game.js) is gated.
 export const config = {
-  matcher: ["/((?!_next/|favicon|.*\\.).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|_next/data|favicon\\.ico|icon\\.svg|apple-icon\\.svg|robots\\.txt|sitemap\\.xml).*)",
+  ],
 };
