@@ -55,7 +55,7 @@ function LoginForm() {
           </div>
         </div>
         <div className="text-center">
-          <h1 className="text-xl font-semibold tracking-tight">Вход в s-site</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Вход в HyperFrames Hub</h1>
           <p className="text-sm text-neutral-400 mt-1">Введите логин и пароль</p>
         </div>
         <div>

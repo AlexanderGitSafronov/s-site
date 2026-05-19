@@ -5,8 +5,8 @@ import { HeaderNav } from "@/components/header-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "s-site — каталог игр и сайтов",
-  description: "Каталог HTML5-игр и сайтов с превью и возможностью играть в браузере",
+  title: "HyperFrames Hub",
+  description: "Каталог HTML5-игр, собранных на HyperFrames — превью и игра в браузере",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </svg>
               </div>
               <span className="text-lg font-semibold tracking-tight group-hover:text-violet-300 transition">
-                s-site
+                HyperFrames Hub
               </span>
             </Link>
             <HeaderNav />

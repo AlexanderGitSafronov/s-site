@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import type { Item } from "@/lib/db";
 import { formatBytes } from "@/lib/format";
 
@@ -8,7 +9,10 @@ export function ItemRow({ item }: { item: Item }) {
   const [deleting, setDeleting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
+  const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -50,6 +54,80 @@ export function ItemRow({ item }: { item: Item }) {
     } catch (e) {
       alert("Ошибка удаления: " + (e as Error).message);
       setDeleting(false);
+    }
+  }
+
+  async function handleReplaceVideo(file: File) {
+    setMenuOpen(false);
+    setBusyLabel("Замена видео…");
+    try {
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+      });
+      const res = await fetch(`/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_url: blob.url,
+          video_filename: file.name,
+          video_size: file.size,
+          video_content_type: file.type || "video/mp4",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `${res.status}`);
+      }
+      window.location.reload();
+    } catch (e) {
+      alert("Ошибка замены видео: " + (e as Error).message);
+      setBusyLabel(null);
+    }
+  }
+
+  async function handleReplaceZip(file: File) {
+    setMenuOpen(false);
+    setBusyLabel("Замена архива…");
+    try {
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+      });
+      setBusyLabel("Распаковка…");
+      const extractRes = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zipUrl: blob.url }),
+      });
+      if (!extractRes.ok) {
+        const err = await extractRes.json().catch(() => ({}));
+        throw new Error(err.error || `extract failed: ${extractRes.status}`);
+      }
+      const { playUrl, playPrefix } = (await extractRes.json()) as {
+        playUrl: string;
+        playPrefix: string;
+      };
+      setBusyLabel("Сохранение…");
+      const res = await fetch(`/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          site_url: blob.url,
+          site_filename: file.name,
+          site_size: file.size,
+          play_url: playUrl,
+          play_prefix: playPrefix,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `${res.status}`);
+      }
+      window.location.reload();
+    } catch (e) {
+      alert("Ошибка замены архива: " + (e as Error).message);
+      setBusyLabel(null);
     }
   }
 
@@ -172,8 +250,33 @@ export function ItemRow({ item }: { item: Item }) {
           {menuOpen && (
             <div
               role="menu"
-              className="absolute right-0 top-full mt-1 bg-neutral-900 border border-white/10 rounded-lg shadow-xl p-1 min-w-[200px] z-10"
+              className="absolute right-0 top-full mt-1 bg-neutral-900 border border-white/10 rounded-lg shadow-xl p-1 min-w-[220px] z-10"
             >
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                disabled={!!busyLabel}
+                className="w-full text-left px-3 py-2 text-sm text-neutral-300 hover:bg-white/5 rounded-md disabled:opacity-50 flex items-center gap-2"
+                role="menuitem"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
+                  <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+                </svg>
+                Заменить видео
+              </button>
+              <button
+                type="button"
+                onClick={() => zipInputRef.current?.click()}
+                disabled={!!busyLabel}
+                className="w-full text-left px-3 py-2 text-sm text-neutral-300 hover:bg-white/5 rounded-md disabled:opacity-50 flex items-center gap-2"
+                role="menuitem"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
+                  <path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" />
+                </svg>
+                Заменить архив игры
+              </button>
+              <div className="h-px bg-white/5 my-1" />
               <a
                 href={item.video_url}
                 download={item.video_filename}
@@ -185,24 +288,11 @@ export function ItemRow({ item }: { item: Item }) {
                 </svg>
                 Скачать видео
               </a>
-              {item.image_url && (
-                <a
-                  href={item.image_url}
-                  download={item.image_filename ?? "cover.jpg"}
-                  className="w-full text-left px-3 py-2 text-sm text-neutral-300 hover:bg-white/5 rounded-md flex items-center gap-2"
-                  role="menuitem"
-                >
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-                  </svg>
-                  Скачать обложку
-                </a>
-              )}
               <div className="h-px bg-white/5 my-1" />
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={deleting}
+                disabled={deleting || !!busyLabel}
                 className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-md disabled:opacity-50 flex items-center gap-2"
                 role="menuitem"
               >
@@ -214,7 +304,39 @@ export function ItemRow({ item }: { item: Item }) {
             </div>
           )}
         </div>
+
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) handleReplaceVideo(f);
+          }}
+        />
+        <input
+          ref={zipInputRef}
+          type="file"
+          accept=".zip,application/zip,application/x-zip-compressed"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) handleReplaceZip(f);
+          }}
+        />
       </div>
+
+      {busyLabel && (
+        <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex items-center justify-center">
+          <div className="card px-6 py-5 flex items-center gap-3">
+            <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+            <span className="text-sm">{busyLabel}</span>
+          </div>
+        </div>
+      )}
 
       {videoOpen && (
         <div
