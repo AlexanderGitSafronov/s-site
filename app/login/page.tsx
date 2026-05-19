@@ -3,10 +3,19 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+/** Allow only same-origin paths to avoid open redirects. */
+function safeNext(value: string | null): string {
+  if (!value) return "/";
+  if (!value.startsWith("/")) return "/";
+  if (value.startsWith("//")) return "/";
+  if (value.startsWith("/\\")) return "/";
+  return value;
+}
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const nextPath = params.get("next") || "/";
+  const nextPath = safeNext(params.get("next"));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,13 +46,10 @@ function LoginForm() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-6">
-      <form
-        onSubmit={handleSubmit}
-        className="card p-8 w-full max-w-sm space-y-5"
-      >
+      <form onSubmit={handleSubmit} className="card p-8 w-full max-w-sm space-y-5">
         <div className="flex justify-center">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center shadow-xl shadow-violet-500/30">
-            <svg viewBox="0 0 24 24" fill="white" className="w-7 h-7">
+            <svg viewBox="0 0 24 24" fill="white" className="w-7 h-7" aria-hidden>
               <path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2z" />
             </svg>
           </div>

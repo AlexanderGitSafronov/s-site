@@ -1,20 +1,29 @@
 import { NextResponse } from "next/server";
 import { COOKIE_NAME, expectedToken, timingSafeEqual } from "@/lib/auth";
+import { readJson, unauthorized } from "@/lib/http";
 
 export const runtime = "nodejs";
 
+type LoginBody = { username?: unknown; password?: unknown };
+
 export async function POST(req: Request) {
-  const { username, password } = await req.json().catch(() => ({}));
+  const body = (await readJson<LoginBody>(req)) ?? {};
+  const username = typeof body.username === "string" ? body.username : "";
+  const password = typeof body.password === "string" ? body.password : "";
+
   const envUser = process.env.AUTH_USERNAME ?? "";
   const envPass = process.env.AUTH_PASSWORD ?? "";
 
-  if (
-    typeof username !== "string" ||
-    typeof password !== "string" ||
-    !timingSafeEqual(username, envUser) ||
-    !timingSafeEqual(password, envPass)
-  ) {
-    return NextResponse.json({ error: "invalid credentials" }, { status: 401 });
+  // Refuse empty creds even if env vars are misconfigured (defence in depth).
+  if (!envUser || !envPass || !username || !password) {
+    return unauthorized("invalid credentials");
+  }
+
+  // Constant-time compare for both fields.
+  const userOk = timingSafeEqual(username, envUser);
+  const passOk = timingSafeEqual(password, envPass);
+  if (!userOk || !passOk) {
+    return unauthorized("invalid credentials");
   }
 
   const token = await expectedToken();

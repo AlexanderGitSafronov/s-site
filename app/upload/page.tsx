@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 
 type Progress = { site: number; video: number; image: number };
+
+const ALLOWED_IMAGE = "image/jpeg,image/png,image/webp,image/gif,image/avif";
+const ALLOWED_VIDEO = "video/mp4,video/webm,video/quicktime,video/x-matroska";
+const ALLOWED_ZIP = ".zip,application/zip,application/x-zip-compressed";
 
 export default function UploadPage() {
   const router = useRouter();
@@ -16,17 +20,28 @@ export default function UploadPage() {
   const [status, setStatus] = useState<string>("");
   const [progress, setProgress] = useState<Progress>({ site: 0, video: 0, image: 0 });
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const imagePreviewUrl = useMemo(
+    () => (imageFile ? URL.createObjectURL(imageFile) : null),
+    [imageFile],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    };
+  }, [imagePreviewUrl]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title || !siteFile || !videoFile || !imageFile) {
-      alert("Заполните название и выберите все три файла.");
+    setError(null);
+    if (!title.trim() || !siteFile || !videoFile || !imageFile) {
+      setError("Заполните название и выберите все три файла.");
       return;
     }
     setBusy(true);
     try {
-      const slug = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-
       setStatus("Загрузка обложки…");
       const imageBlob = await upload(imageFile.name, imageFile, {
         access: "public",
@@ -52,21 +67,24 @@ export default function UploadPage() {
       const extractRes = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zipUrl: siteBlob.url, slug }),
+        body: JSON.stringify({ zipUrl: siteBlob.url }),
       });
       if (!extractRes.ok) {
         const err = await extractRes.json().catch(() => ({}));
         throw new Error(err.error || `extract failed: ${extractRes.status}`);
       }
-      const { playUrl, playPrefix } = await extractRes.json();
+      const { playUrl, playPrefix } = (await extractRes.json()) as {
+        playUrl: string;
+        playPrefix: string;
+      };
 
       setStatus("Сохранение…");
       const res = await fetch("/api/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title,
-          description,
+          title: title.trim(),
+          description: description.trim() || null,
           site_url: siteBlob.url,
           site_filename: siteFile.name,
           site_size: siteFile.size,
@@ -82,11 +100,15 @@ export default function UploadPage() {
           play_prefix: playPrefix,
         }),
       });
-      if (!res.ok) throw new Error(`save failed: ${res.status}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `save failed: ${res.status}`);
+      }
       router.push("/");
+      router.refresh();
     } catch (err) {
       console.error(err);
-      alert("Ошибка загрузки: " + (err as Error).message);
+      setError((err as Error).message);
       setBusy(false);
     }
   }
@@ -100,7 +122,7 @@ export default function UploadPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         <div className="card p-6 space-y-5">
           <div>
             <label className="block text-sm font-medium mb-2 text-neutral-200">Название</label>
@@ -109,6 +131,7 @@ export default function UploadPage() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={busy}
+              maxLength={200}
               required
               placeholder="Моя игра"
               className="input"
@@ -122,6 +145,7 @@ export default function UploadPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={busy}
+              maxLength={5000}
               rows={3}
               placeholder="Жанр, управление, краткое описание…"
               className="input resize-none"
@@ -133,19 +157,19 @@ export default function UploadPage() {
           <FileSlot
             label="Обложка"
             hint="JPG/PNG/WEBP"
-            accept="image/*"
+            accept={ALLOWED_IMAGE}
             file={imageFile}
             onChange={setImageFile}
             disabled={busy}
             percent={progress.image}
             showProgress={busy}
-            previewUrl={imageFile ? URL.createObjectURL(imageFile) : null}
+            previewUrl={imagePreviewUrl}
             kind="image"
           />
           <FileSlot
             label="Видео-превью"
             hint="MP4/WebM"
-            accept="video/*"
+            accept={ALLOWED_VIDEO}
             file={videoFile}
             onChange={setVideoFile}
             disabled={busy}
@@ -157,7 +181,7 @@ export default function UploadPage() {
           <FileSlot
             label="Архив игры"
             hint=".zip с index.html"
-            accept=".zip,application/zip,application/x-zip-compressed"
+            accept={ALLOWED_ZIP}
             file={siteFile}
             onChange={setSiteFile}
             disabled={busy}
@@ -168,6 +192,12 @@ export default function UploadPage() {
           />
         </div>
 
+        {error && (
+          <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+            {error}
+          </div>
+        )}
+
         <button type="submit" disabled={busy} className="btn-primary w-full text-base py-3.5">
           {busy ? (
             <>
@@ -176,7 +206,7 @@ export default function UploadPage() {
             </>
           ) : (
             <>
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5" aria-hidden>
                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
               </svg>
               Опубликовать
@@ -213,15 +243,9 @@ function FileSlot({
 }) {
   const inputId = `file-${kind}`;
   const icon = {
-    image: (
-      <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
-    ),
-    video: (
-      <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
-    ),
-    zip: (
-      <path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" />
-    ),
+    image: <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />,
+    video: <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />,
+    zip: <path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" />,
   }[kind];
 
   return (
@@ -237,7 +261,7 @@ function FileSlot({
           <div className="text-xs text-neutral-500 mt-0.5">{hint}</div>
         </div>
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${file ? "bg-violet-500/20 text-violet-300" : "bg-white/5 text-neutral-500"}`}>
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
             {icon}
           </svg>
         </div>
@@ -245,7 +269,7 @@ function FileSlot({
 
       {previewUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={previewUrl} alt="preview" className="rounded-lg w-full h-24 object-cover border border-white/10" />
+        <img src={previewUrl} alt="" className="rounded-lg w-full h-24 object-cover border border-white/10" />
       )}
 
       {file ? (
@@ -259,7 +283,7 @@ function FileSlot({
       {showProgress && file && (
         <div>
           <div className="flex justify-between text-[10px] text-neutral-500 mb-1">
-            <span>{percent === 100 ? "Готово" : "Загрузка"}</span>
+            <span>{percent >= 100 ? "Готово" : "Загрузка"}</span>
             <span>{Math.round(percent)}%</span>
           </div>
           <div className="h-1 bg-white/5 rounded-full overflow-hidden">
