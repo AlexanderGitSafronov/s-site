@@ -133,7 +133,11 @@ export function ItemRow({ item }: { item: Item }) {
 
   return (
     <>
-      <div className="card flex flex-col md:flex-row gap-4 p-4 hover:bg-white/[0.04] transition">
+      <div
+        className={`card flex flex-col md:flex-row gap-4 p-4 hover:bg-white/[0.04] transition relative ${
+          menuOpen ? "z-30" : "z-0"
+        }`}
+      >
         {/* Thumbnail */}
         <button
           type="button"
@@ -250,7 +254,7 @@ export function ItemRow({ item }: { item: Item }) {
           {menuOpen && (
             <div
               role="menu"
-              className="absolute right-0 top-full mt-1 bg-neutral-900 border border-white/10 rounded-lg shadow-xl p-1 min-w-[220px] z-10"
+              className="absolute right-0 top-full mt-1 bg-neutral-900 border border-white/10 rounded-lg shadow-2xl p-1 min-w-[220px] z-50"
             >
               <button
                 type="button"
