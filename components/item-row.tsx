@@ -9,6 +9,8 @@ export function ItemRow({ item }: { item: Item }) {
   const [deleting, setDeleting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
+  const [playOpen, setPlayOpen] = useState(false);
+  const [playMode, setPlayMode] = useState<"pc" | "mobile">("pc");
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +45,20 @@ export function ItemRow({ item }: { item: Item }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [videoOpen]);
+
+  useEffect(() => {
+    if (!playOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPlayOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [playOpen]);
 
   async function handleDelete() {
     if (!confirm(`Удалить "${item.title}"? Все файлы будут стёрты.`)) return;
@@ -203,17 +219,16 @@ export function ItemRow({ item }: { item: Item }) {
         {/* Actions */}
         <div className="flex flex-row md:flex-col gap-2 md:w-48 shrink-0 flex-wrap">
           {item.play_url && (
-            <a
-              href={item.play_url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => setPlayOpen(true)}
               className="btn-primary flex-1 md:flex-none"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
                 <path d="M8 5v14l11-7z" />
               </svg>
               Играть
-            </a>
+            </button>
           )}
           <button
             type="button"
@@ -372,6 +387,95 @@ export function ItemRow({ item }: { item: Item }) {
               preload="metadata"
               className="w-full max-h-[80vh] rounded-xl bg-black object-contain shadow-2xl"
             />
+          </div>
+        </div>
+      )}
+
+      {playOpen && item.play_url && (
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex flex-col">
+          <div className="flex items-center justify-between gap-3 p-3 sm:p-4 border-b border-white/10">
+            <h3 className="text-white font-medium truncate min-w-0">{item.title}</h3>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-1 flex">
+                <button
+                  type="button"
+                  onClick={() => setPlayMode("pc")}
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition ${
+                    playMode === "pc"
+                      ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow"
+                      : "text-neutral-400 hover:text-white"
+                  }`}
+                  aria-pressed={playMode === "pc"}
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
+                    <path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z" />
+                  </svg>
+                  ПК
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlayMode("mobile")}
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition ${
+                    playMode === "mobile"
+                      ? "bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow"
+                      : "text-neutral-400 hover:text-white"
+                  }`}
+                  aria-pressed={playMode === "mobile"}
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
+                    <path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14z" />
+                  </svg>
+                  Моб
+                </button>
+              </div>
+              <a
+                href={item.play_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:flex w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 text-white items-center justify-center transition"
+                title="Открыть в новой вкладке"
+                aria-label="Открыть в новой вкладке"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden>
+                  <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+                </svg>
+              </a>
+              <button
+                type="button"
+                onClick={() => setPlayOpen(false)}
+                className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                aria-label="Закрыть"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5" aria-hidden>
+                  <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 flex items-center justify-center p-2 sm:p-4 overflow-auto">
+            {playMode === "pc" ? (
+              <iframe
+                key="pc"
+                src={item.play_url}
+                title={item.title}
+                allow="autoplay; fullscreen; gamepad; accelerometer; gyroscope"
+                className="w-full h-full rounded-xl bg-white shadow-2xl"
+              />
+            ) : (
+              <div className="rounded-[2rem] border-[6px] border-neutral-800 bg-neutral-900 shadow-2xl p-1 max-h-full">
+                <iframe
+                  key="mobile"
+                  src={item.play_url}
+                  title={item.title}
+                  allow="autoplay; fullscreen; gamepad; accelerometer; gyroscope"
+                  className="block rounded-[1.5rem] bg-white"
+                  style={{
+                    width: "min(390px, calc(100vw - 32px))",
+                    height: "min(844px, calc(100vh - 120px))",
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
