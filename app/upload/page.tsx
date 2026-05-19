@@ -140,7 +140,7 @@ export default function UploadPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-2 text-neutral-200">
-              Автор <span className="text-neutral-500 font-normal">— ваше имя, запомнится в браузере</span>
+              Автор <span className="text-neutral-500 font-normal">— ваш ник в Telegram, запомнится в браузере</span>
             </label>
             <input
               type="text"
@@ -148,7 +148,7 @@ export default function UploadPage() {
               onChange={(e) => setAuthor(e.target.value)}
               disabled={busy}
               maxLength={100}
-              placeholder="Например: Саша"
+              placeholder="@username"
               className="input"
             />
           </div>

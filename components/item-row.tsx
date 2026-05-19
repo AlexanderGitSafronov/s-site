@@ -172,7 +172,7 @@ export function ItemRow({ item }: { item: Item }) {
             />
           ) : (
             <video
-              src={item.video_url + "#t=0.1"}
+              src={item.video_url + "#t=2"}
               preload="metadata"
               muted
               playsInline
