@@ -24,6 +24,12 @@ async function main() {
       created_at    timestamptz NOT NULL DEFAULT now()
     );
   `;
+  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS image_url text;`;
+  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS image_filename text;`;
+  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS image_size bigint NOT NULL DEFAULT 0;`;
+  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS image_content_type text;`;
+  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS play_url text;`;
+  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS play_prefix text;`;
   await sql`CREATE INDEX IF NOT EXISTS items_created_at_idx ON items (created_at DESC);`;
   console.log("DB initialized.");
 }

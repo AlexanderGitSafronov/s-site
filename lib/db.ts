@@ -17,5 +17,11 @@ export type Item = {
   video_filename: string;
   video_size: number;
   video_content_type: string;
+  image_url: string | null;
+  image_filename: string | null;
+  image_size: number;
+  image_content_type: string | null;
+  play_url: string | null;
+  play_prefix: string | null;
   created_at: string;
 };

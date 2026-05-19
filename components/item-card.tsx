@@ -12,9 +12,11 @@ function formatBytes(bytes: number) {
 
 export function ItemCard({ item }: { item: Item }) {
   const [deleting, setDeleting] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(`Удалить "${item.title}"? Файлы тоже будут стёрты.`)) return;
+    if (!confirm(`Удалить "${item.title}"? Все файлы будут стёрты.`)) return;
     setDeleting(true);
     const res = await fetch(`/api/items/${item.id}`, { method: "DELETE" });
     if (res.ok) {
@@ -26,47 +28,130 @@ export function ItemCard({ item }: { item: Item }) {
   }
 
   return (
-    <div className="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden flex flex-col">
-      <video
-        src={item.video_url}
-        controls
-        preload="metadata"
-        className="w-full aspect-video bg-black object-cover"
-      />
-      <div className="p-4 flex-1 flex flex-col gap-3">
+    <div className="card group">
+      <div className="relative aspect-video bg-black overflow-hidden">
+        {showVideo ? (
+          <video
+            src={item.video_url}
+            poster={item.image_url ?? undefined}
+            controls
+            autoPlay
+            preload="metadata"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowVideo(true)}
+            className="block w-full h-full relative"
+            aria-label="Воспроизвести превью"
+          >
+            {item.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.image_url}
+                alt={item.title}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-neutral-800 to-neutral-900" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+            <div className="absolute inset-0 flex items-center justify-center opacity-90 group-hover:opacity-100 transition">
+              <div className="w-16 h-16 rounded-full bg-white/95 backdrop-blur flex items-center justify-center shadow-2xl shadow-violet-500/20 group-hover:scale-110 transition-transform">
+                <svg viewBox="0 0 24 24" fill="black" className="w-7 h-7 ml-1">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+            </div>
+          </button>
+        )}
+      </div>
+
+      <div className="p-5 flex flex-col gap-4">
         <div>
-          <h2 className="font-semibold text-lg leading-tight">{item.title}</h2>
+          <h2 className="font-semibold text-lg leading-snug tracking-tight">{item.title}</h2>
           {item.description && (
-            <p className="text-sm text-neutral-400 mt-1 line-clamp-3">{item.description}</p>
+            <p className="text-sm text-neutral-400 mt-1.5 line-clamp-2">{item.description}</p>
           )}
         </div>
-        <div className="text-xs text-neutral-500 flex justify-between mt-auto">
-          <span>Сайт: {formatBytes(item.site_size)}</span>
-          <span>Видео: {formatBytes(item.video_size)}</span>
+
+        <div className="flex items-center gap-2 text-[11px] text-neutral-500 uppercase tracking-wide">
+          <span className="flex items-center gap-1">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+              <path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" />
+            </svg>
+            {formatBytes(item.site_size)}
+          </span>
+          <span className="text-neutral-700">•</span>
+          <span className="flex items-center gap-1">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+            </svg>
+            {formatBytes(item.video_size)}
+          </span>
         </div>
-        <div className="flex gap-2">
-          <a
-            href={item.site_url}
-            download={item.site_filename}
-            className="flex-1 text-center bg-white text-black px-3 py-2 rounded-md text-sm font-medium hover:bg-neutral-200"
-          >
-            Скачать сайт
-          </a>
-          <a
-            href={item.video_url}
-            download={item.video_filename}
-            className="flex-1 text-center bg-neutral-800 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-neutral-700"
-          >
-            Скачать видео
-          </a>
+
+        <div className="flex flex-col gap-2">
+          {item.play_url && (
+            <a
+              href={item.play_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary w-full"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Играть
+            </a>
+          )}
+          <div className="flex gap-2">
+            <a
+              href={item.site_url}
+              download={item.site_filename}
+              className="btn-secondary flex-1"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+              </svg>
+              Архив
+            </a>
+            <a
+              href={item.video_url}
+              download={item.video_filename}
+              className="btn-secondary flex-1"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+              </svg>
+              Видео
+            </a>
+          </div>
         </div>
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className="text-xs text-neutral-500 hover:text-red-400 disabled:opacity-50"
-        >
-          {deleting ? "Удаление…" : "Удалить"}
-        </button>
+
+        <div className="relative pt-2 border-t border-white/5">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="text-xs text-neutral-500 hover:text-white transition flex items-center gap-1"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+            </svg>
+            Действия
+          </button>
+          {menuOpen && (
+            <div className="absolute left-0 bottom-full mb-2 bg-neutral-900 border border-white/10 rounded-lg shadow-xl p-1 min-w-[160px] z-10">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-md disabled:opacity-50"
+              >
+                {deleting ? "Удаление…" : "Удалить"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

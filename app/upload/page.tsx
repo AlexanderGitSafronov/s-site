@@ -4,25 +4,37 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 
+type Progress = { site: number; video: number; image: number };
+
 export default function UploadPage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [siteFile, setSiteFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<string>("");
-  const [progress, setProgress] = useState<{ site: number; video: number }>({ site: 0, video: 0 });
+  const [progress, setProgress] = useState<Progress>({ site: 0, video: 0, image: 0 });
   const [busy, setBusy] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title || !siteFile || !videoFile) {
-      alert("Заполните название, выберите архив сайта и видео.");
+    if (!title || !siteFile || !videoFile || !imageFile) {
+      alert("Заполните название и выберите все три файла.");
       return;
     }
     setBusy(true);
-    setStatus("Загрузка архива сайта…");
     try {
+      const slug = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+      setStatus("Загрузка обложки…");
+      const imageBlob = await upload(imageFile.name, imageFile, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+        onUploadProgress: (e) => setProgress((p) => ({ ...p, image: e.percentage })),
+      });
+
+      setStatus("Загрузка архива…");
       const siteBlob = await upload(siteFile.name, siteFile, {
         access: "public",
         handleUploadUrl: "/api/upload",
@@ -36,7 +48,19 @@ export default function UploadPage() {
         onUploadProgress: (e) => setProgress((p) => ({ ...p, video: e.percentage })),
       });
 
-      setStatus("Сохранение записи…");
+      setStatus("Распаковка игры…");
+      const extractRes = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zipUrl: siteBlob.url, slug }),
+      });
+      if (!extractRes.ok) {
+        const err = await extractRes.json().catch(() => ({}));
+        throw new Error(err.error || `extract failed: ${extractRes.status}`);
+      }
+      const { playUrl, playPrefix } = await extractRes.json();
+
+      setStatus("Сохранение…");
       const res = await fetch("/api/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -50,6 +74,12 @@ export default function UploadPage() {
           video_filename: videoFile.name,
           video_size: videoFile.size,
           video_content_type: videoFile.type || "video/mp4",
+          image_url: imageBlob.url,
+          image_filename: imageFile.name,
+          image_size: imageFile.size,
+          image_content_type: imageFile.type || "image/jpeg",
+          play_url: playUrl,
+          play_prefix: playPrefix,
         }),
       });
       if (!res.ok) throw new Error(`save failed: ${res.status}`);
@@ -62,80 +92,193 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">Новая запись</h1>
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label className="block text-sm mb-1 text-neutral-300">Название *</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={busy}
-            required
-            className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 focus:outline-none focus:border-neutral-500"
-          />
+    <div className="max-w-2xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-semibold tracking-tight">Новая игра</h1>
+        <p className="text-sm text-neutral-400 mt-1.5">
+          Архив распакуется автоматически, и появится кнопка «Играть».
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="card p-6 space-y-5">
+          <div>
+            <label className="block text-sm font-medium mb-2 text-neutral-200">Название</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={busy}
+              required
+              placeholder="Моя игра"
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-neutral-200">
+              Описание <span className="text-neutral-500 font-normal">— необязательно</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={busy}
+              rows={3}
+              placeholder="Жанр, управление, краткое описание…"
+              className="input resize-none"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm mb-1 text-neutral-300">Описание</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FileSlot
+            label="Обложка"
+            hint="JPG/PNG/WEBP"
+            accept="image/*"
+            file={imageFile}
+            onChange={setImageFile}
             disabled={busy}
-            rows={3}
-            className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2 focus:outline-none focus:border-neutral-500"
+            percent={progress.image}
+            showProgress={busy}
+            previewUrl={imageFile ? URL.createObjectURL(imageFile) : null}
+            kind="image"
           />
-        </div>
-        <div>
-          <label className="block text-sm mb-1 text-neutral-300">Архив сайта (.zip) *</label>
-          <input
-            type="file"
-            accept=".zip,application/zip,application/x-zip-compressed"
-            onChange={(e) => setSiteFile(e.target.files?.[0] ?? null)}
-            disabled={busy}
-            required
-            className="block w-full text-sm text-neutral-400 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-neutral-800 file:text-white hover:file:bg-neutral-700"
-          />
-          {busy && siteFile && (
-            <ProgressBar percent={progress.site} label="Сайт" />
-          )}
-        </div>
-        <div>
-          <label className="block text-sm mb-1 text-neutral-300">Видео-превью *</label>
-          <input
-            type="file"
+          <FileSlot
+            label="Видео-превью"
+            hint="MP4/WebM"
             accept="video/*"
-            onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+            file={videoFile}
+            onChange={setVideoFile}
             disabled={busy}
-            required
-            className="block w-full text-sm text-neutral-400 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-neutral-800 file:text-white hover:file:bg-neutral-700"
+            percent={progress.video}
+            showProgress={busy}
+            previewUrl={null}
+            kind="video"
           />
-          {busy && videoFile && (
-            <ProgressBar percent={progress.video} label="Видео" />
-          )}
+          <FileSlot
+            label="Архив игры"
+            hint=".zip с index.html"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            file={siteFile}
+            onChange={setSiteFile}
+            disabled={busy}
+            percent={progress.site}
+            showProgress={busy}
+            previewUrl={null}
+            kind="zip"
+          />
         </div>
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full bg-white text-black px-4 py-2.5 rounded-md font-medium hover:bg-neutral-200 disabled:opacity-60"
-        >
-          {busy ? status || "Загрузка…" : "Загрузить"}
+
+        <button type="submit" disabled={busy} className="btn-primary w-full text-base py-3.5">
+          {busy ? (
+            <>
+              <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              {status || "Загрузка…"}
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+              Опубликовать
+            </>
+          )}
         </button>
       </form>
     </div>
   );
 }
 
-function ProgressBar({ percent, label }: { percent: number; label: string }) {
+function FileSlot({
+  label,
+  hint,
+  accept,
+  file,
+  onChange,
+  disabled,
+  percent,
+  showProgress,
+  previewUrl,
+  kind,
+}: {
+  label: string;
+  hint: string;
+  accept: string;
+  file: File | null;
+  onChange: (f: File | null) => void;
+  disabled: boolean;
+  percent: number;
+  showProgress: boolean;
+  previewUrl: string | null;
+  kind: "image" | "video" | "zip";
+}) {
+  const inputId = `file-${kind}`;
+  const icon = {
+    image: (
+      <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+    ),
+    video: (
+      <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+    ),
+    zip: (
+      <path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" />
+    ),
+  }[kind];
+
   return (
-    <div className="mt-2">
-      <div className="flex justify-between text-xs text-neutral-500 mb-1">
-        <span>{label}</span>
-        <span>{Math.round(percent)}%</span>
+    <label
+      htmlFor={inputId}
+      className={`card p-4 flex flex-col gap-3 cursor-pointer hover:bg-white/[0.05] transition ${
+        disabled ? "opacity-60 pointer-events-none" : ""
+      } ${file ? "border-violet-500/40" : ""}`}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-sm font-medium text-white">{label}</div>
+          <div className="text-xs text-neutral-500 mt-0.5">{hint}</div>
+        </div>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${file ? "bg-violet-500/20 text-violet-300" : "bg-white/5 text-neutral-500"}`}>
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+            {icon}
+          </svg>
+        </div>
       </div>
-      <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-        <div className="h-full bg-white transition-all" style={{ width: `${percent}%` }} />
-      </div>
-    </div>
+
+      {previewUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={previewUrl} alt="preview" className="rounded-lg w-full h-24 object-cover border border-white/10" />
+      )}
+
+      {file ? (
+        <div className="text-xs text-neutral-400 truncate" title={file.name}>
+          {file.name}
+        </div>
+      ) : (
+        <div className="text-xs text-neutral-600">Файл не выбран</div>
+      )}
+
+      {showProgress && file && (
+        <div>
+          <div className="flex justify-between text-[10px] text-neutral-500 mb-1">
+            <span>{percent === 100 ? "Готово" : "Загрузка"}</span>
+            <span>{Math.round(percent)}%</span>
+          </div>
+          <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <input
+        id={inputId}
+        type="file"
+        accept={accept}
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        disabled={disabled}
+        className="sr-only"
+      />
+    </label>
   );
 }
