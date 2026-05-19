@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { sql, type Item } from "@/lib/db";
-import { ItemCard } from "@/components/item-card";
+import { ItemRow } from "@/components/item-row";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +44,9 @@ export default async function HomePage() {
           </p>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="flex flex-col gap-3">
         {rows.map((item) => (
-          <ItemCard key={item.id} item={item} />
+          <ItemRow key={item.id} item={item} />
         ))}
       </div>
     </div>

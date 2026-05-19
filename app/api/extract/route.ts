@@ -20,6 +20,15 @@ function isUnsafePath(p: string): boolean {
   return false;
 }
 
+function isJunkPath(p: string): boolean {
+  // macOS resource forks, .DS_Store; Windows thumbs; common junk metadata
+  if (p.startsWith("__MACOSX/") || p.includes("/__MACOSX/")) return true;
+  const base = p.split("/").pop() ?? "";
+  if (base === ".DS_Store" || base === "Thumbs.db") return true;
+  if (base.startsWith("._")) return true;
+  return false;
+}
+
 export async function POST(req: Request) {
   const body = await readJson<{ zipUrl?: unknown }>(req);
   if (!body || !isOurBlobUrl(body.zipUrl)) {
@@ -57,7 +66,11 @@ export async function POST(req: Request) {
   }
 
   const paths = Object.keys(entries).filter(
-    (p) => !p.endsWith("/") && entries[p].length > 0 && !isUnsafePath(p),
+    (p) =>
+      !p.endsWith("/") &&
+      entries[p].length > 0 &&
+      !isUnsafePath(p) &&
+      !isJunkPath(p),
   );
   if (paths.length === 0) return badRequest("zip is empty");
   if (paths.length > MAX_FILES) return badRequest(`too many files (max ${MAX_FILES})`);
@@ -89,6 +102,9 @@ export async function POST(req: Request) {
         const result = await put(pathname, Buffer.from(entries[raw]), {
           access: "public",
           contentType: mimeFor(rel),
+          // Inline so the browser renders HTML/JS/WASM/images instead of
+          // forcing a download (Vercel Blob defaults to attachment).
+          contentDisposition: `inline; filename="${encodeURIComponent(rel.split("/").pop() ?? "file")}"`,
           addRandomSuffix: false,
           allowOverwrite: false,
         });
