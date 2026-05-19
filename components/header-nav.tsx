@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 export function HeaderNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const isAuthPage = pathname === "/login";
 
   if (isAuthPage) return null;
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
+    window.location.replace("/login");
   }
 
   return (

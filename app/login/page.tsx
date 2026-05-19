@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 /** Allow only same-origin paths to avoid open redirects. */
 function safeNext(value: string | null): string {
@@ -13,7 +13,6 @@ function safeNext(value: string | null): string {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const nextPath = safeNext(params.get("next"));
   const [username, setUsername] = useState("");
@@ -32,8 +31,9 @@ function LoginForm() {
         body: JSON.stringify({ username, password }),
       });
       if (res.ok) {
-        router.replace(nextPath);
-        router.refresh();
+        // Hard navigation: bypasses Next router cache that may still hold the
+        // pre-login 307 redirect from "/" and would loop us back to /login.
+        window.location.replace(nextPath);
       } else {
         setError("Неверный логин или пароль");
         setBusy(false);

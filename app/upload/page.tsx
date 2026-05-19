@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 
 type Progress = { site: number; video: number; image: number };
@@ -11,7 +10,6 @@ const ALLOWED_VIDEO = "video/mp4,video/webm,video/quicktime,video/x-matroska";
 const ALLOWED_ZIP = ".zip,application/zip,application/x-zip-compressed";
 
 export default function UploadPage() {
-  const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [siteFile, setSiteFile] = useState<File | null>(null);
@@ -104,8 +102,7 @@ export default function UploadPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `save failed: ${res.status}`);
       }
-      router.push("/");
-      router.refresh();
+      window.location.replace("/");
     } catch (err) {
       console.error(err);
       setError((err as Error).message);
