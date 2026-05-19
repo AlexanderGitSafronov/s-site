@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const rows = (await sql`
-    SELECT id, title, description, site_url, site_filename, site_size,
+    SELECT id, title, description, author, site_url, site_filename, site_size,
            video_url, video_filename, video_size, video_content_type,
            image_url, image_filename, image_size, image_content_type,
            play_url, play_prefix, created_at

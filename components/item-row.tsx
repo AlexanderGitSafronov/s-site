@@ -193,6 +193,14 @@ export function ItemRow({ item }: { item: Item }) {
         <div className="flex-1 min-w-0 flex flex-col gap-2">
           <div>
             <h2 className="font-semibold text-lg leading-snug tracking-tight">{item.title}</h2>
+            {item.author && (
+              <div className="text-xs text-violet-300/80 mt-1 flex items-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5" aria-hidden>
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+                {item.author}
+              </div>
+            )}
             {item.description && (
               <p className="text-sm text-neutral-400 mt-1 line-clamp-2 whitespace-pre-line">
                 {item.description}

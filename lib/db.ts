@@ -23,5 +23,6 @@ export type Item = {
   image_content_type: string | null;
   play_url: string | null;
   play_prefix: string | null;
+  author: string | null;
   created_at: string;
 };

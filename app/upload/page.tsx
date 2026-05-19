@@ -1,22 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { upload } from "@vercel/blob/client";
 
 type Progress = { site: number; video: number };
 
 const ALLOWED_VIDEO = "video/mp4,video/webm,video/quicktime,video/x-matroska";
 const ALLOWED_ZIP = ".zip,application/zip,application/x-zip-compressed";
+const AUTHOR_KEY = "hf:author";
 
 export default function UploadPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [author, setAuthor] = useState("");
   const [siteFile, setSiteFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [status, setStatus] = useState<string>("");
   const [progress, setProgress] = useState<Progress>({ site: 0, video: 0 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(AUTHOR_KEY);
+      if (saved) setAuthor(saved);
+    } catch {}
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,12 +66,17 @@ export default function UploadPage() {
       };
 
       setStatus("Сохранение…");
+      const trimmedAuthor = author.trim();
+      try {
+        if (trimmedAuthor) localStorage.setItem(AUTHOR_KEY, trimmedAuthor);
+      } catch {}
       const res = await fetch("/api/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || null,
+          author: trimmedAuthor || null,
           site_url: siteBlob.url,
           site_filename: siteFile.name,
           site_size: siteFile.size,
@@ -122,6 +136,20 @@ export default function UploadPage() {
               rows={3}
               placeholder="Жанр, управление, краткое описание…"
               className="input resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-neutral-200">
+              Автор <span className="text-neutral-500 font-normal">— ваше имя, запомнится в браузере</span>
+            </label>
+            <input
+              type="text"
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              disabled={busy}
+              maxLength={100}
+              placeholder="Например: Саша"
+              className="input"
             />
           </div>
         </div>

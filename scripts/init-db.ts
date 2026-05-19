@@ -30,6 +30,7 @@ async function main() {
   await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS image_content_type text;`;
   await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS play_url text;`;
   await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS play_prefix text;`;
+  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS author text;`;
   await sql`CREATE INDEX IF NOT EXISTS items_created_at_idx ON items (created_at DESC);`;
   console.log("DB initialized.");
 }

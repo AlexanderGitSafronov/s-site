@@ -9,6 +9,7 @@ const MAX_DESCRIPTION = 5000;
 type Body = {
   title?: unknown;
   description?: unknown;
+  author?: unknown;
   site_url?: unknown;
   site_filename?: unknown;
   site_size?: unknown;
@@ -44,6 +45,11 @@ export async function POST(req: Request) {
       ? body.description.trim() || null
       : null;
 
+  const author =
+    typeof body.author === "string" && body.author.length <= 100
+      ? body.author.trim() || null
+      : null;
+
   if (!isOurBlobUrl(body.site_url)) return badRequest("site_url must be from our blob store");
   if (!isOurBlobUrl(body.video_url)) return badRequest("video_url must be from our blob store");
   if (body.image_url != null && !isOurBlobUrl(body.image_url))
@@ -69,12 +75,12 @@ export async function POST(req: Request) {
   try {
     const rows = (await sql`
       INSERT INTO items
-        (title, description, site_url, site_filename, site_size,
+        (title, description, author, site_url, site_filename, site_size,
          video_url, video_filename, video_size, video_content_type,
          image_url, image_filename, image_size, image_content_type,
          play_url, play_prefix)
       VALUES
-        (${title}, ${description}, ${body.site_url}, ${site_filename}, ${asSize(body.site_size)},
+        (${title}, ${description}, ${author}, ${body.site_url}, ${site_filename}, ${asSize(body.site_size)},
          ${body.video_url}, ${video_filename}, ${asSize(body.video_size)}, ${video_content_type},
          ${image_url}, ${image_filename}, ${image_size}, ${image_content_type},
          ${body.play_url ?? null}, ${play_prefix})
