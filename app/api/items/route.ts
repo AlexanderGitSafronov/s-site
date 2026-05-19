@@ -46,7 +46,8 @@ export async function POST(req: Request) {
 
   if (!isOurBlobUrl(body.site_url)) return badRequest("site_url must be from our blob store");
   if (!isOurBlobUrl(body.video_url)) return badRequest("video_url must be from our blob store");
-  if (!isOurBlobUrl(body.image_url)) return badRequest("image_url must be from our blob store");
+  if (body.image_url != null && !isOurBlobUrl(body.image_url))
+    return badRequest("image_url must be from our blob store");
   // play_url is now a relative path served by our /play/[...path] proxy.
   if (
     body.play_url != null &&
@@ -57,10 +58,13 @@ export async function POST(req: Request) {
 
   const site_filename = asStr(body.site_filename, 500) ?? "site.zip";
   const video_filename = asStr(body.video_filename, 500) ?? "video.mp4";
-  const image_filename = asStr(body.image_filename, 500) ?? "image.jpg";
   const video_content_type = asStr(body.video_content_type, 200) ?? "video/mp4";
-  const image_content_type = asStr(body.image_content_type, 200) ?? "image/jpeg";
   const play_prefix = asStr(body.play_prefix, 200);
+
+  const image_url = isOurBlobUrl(body.image_url) ? body.image_url : null;
+  const image_filename = image_url ? asStr(body.image_filename, 500) : null;
+  const image_content_type = image_url ? asStr(body.image_content_type, 200) ?? "image/jpeg" : null;
+  const image_size = image_url ? asSize(body.image_size) : 0;
 
   try {
     const rows = (await sql`
@@ -72,7 +76,7 @@ export async function POST(req: Request) {
       VALUES
         (${title}, ${description}, ${body.site_url}, ${site_filename}, ${asSize(body.site_size)},
          ${body.video_url}, ${video_filename}, ${asSize(body.video_size)}, ${video_content_type},
-         ${body.image_url}, ${image_filename}, ${asSize(body.image_size)}, ${image_content_type},
+         ${image_url}, ${image_filename}, ${image_size}, ${image_content_type},
          ${body.play_url ?? null}, ${play_prefix})
       RETURNING id
     `) as { id: string }[];

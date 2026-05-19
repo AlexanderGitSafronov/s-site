@@ -73,7 +73,13 @@ export function ItemRow({ item }: { item: Item }) {
               className="w-full h-full object-cover transition-transform duration-500 group-hover/thumb:scale-[1.04]"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-neutral-800 to-neutral-900" />
+            <video
+              src={item.video_url + "#t=0.1"}
+              preload="metadata"
+              muted
+              playsInline
+              className="w-full h-full object-cover transition-transform duration-500 group-hover/thumb:scale-[1.04]"
+            />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <div className="absolute inset-0 flex items-center justify-center opacity-90 group-hover/thumb:opacity-100 transition">

@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { upload } from "@vercel/blob/client";
 
-type Progress = { site: number; video: number; image: number };
+type Progress = { site: number; video: number };
 
-const ALLOWED_IMAGE = "image/jpeg,image/png,image/webp,image/gif,image/avif";
 const ALLOWED_VIDEO = "video/mp4,video/webm,video/quicktime,video/x-matroska";
 const ALLOWED_ZIP = ".zip,application/zip,application/x-zip-compressed";
 
@@ -14,39 +13,20 @@ export default function UploadPage() {
   const [description, setDescription] = useState("");
   const [siteFile, setSiteFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<string>("");
-  const [progress, setProgress] = useState<Progress>({ site: 0, video: 0, image: 0 });
+  const [progress, setProgress] = useState<Progress>({ site: 0, video: 0 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const imagePreviewUrl = useMemo(
-    () => (imageFile ? URL.createObjectURL(imageFile) : null),
-    [imageFile],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
-    };
-  }, [imagePreviewUrl]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!title.trim() || !siteFile || !videoFile || !imageFile) {
-      setError("Заполните название и выберите все три файла.");
+    if (!title.trim() || !siteFile || !videoFile) {
+      setError("Заполните название и выберите архив с игрой и видео.");
       return;
     }
     setBusy(true);
     try {
-      setStatus("Загрузка обложки…");
-      const imageBlob = await upload(imageFile.name, imageFile, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-        onUploadProgress: (e) => setProgress((p) => ({ ...p, image: e.percentage })),
-      });
-
       setStatus("Загрузка архива…");
       const siteBlob = await upload(siteFile.name, siteFile, {
         access: "public",
@@ -90,10 +70,6 @@ export default function UploadPage() {
           video_filename: videoFile.name,
           video_size: videoFile.size,
           video_content_type: videoFile.type || "video/mp4",
-          image_url: imageBlob.url,
-          image_filename: imageFile.name,
-          image_size: imageFile.size,
-          image_content_type: imageFile.type || "image/jpeg",
           play_url: playUrl,
           play_prefix: playPrefix,
         }),
@@ -150,19 +126,7 @@ export default function UploadPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FileSlot
-            label="Обложка"
-            hint="JPG/PNG/WEBP"
-            accept={ALLOWED_IMAGE}
-            file={imageFile}
-            onChange={setImageFile}
-            disabled={busy}
-            percent={progress.image}
-            showProgress={busy}
-            previewUrl={imagePreviewUrl}
-            kind="image"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FileSlot
             label="Видео-превью"
             hint="MP4/WebM"
@@ -172,7 +136,6 @@ export default function UploadPage() {
             disabled={busy}
             percent={progress.video}
             showProgress={busy}
-            previewUrl={null}
             kind="video"
           />
           <FileSlot
@@ -184,7 +147,6 @@ export default function UploadPage() {
             disabled={busy}
             percent={progress.site}
             showProgress={busy}
-            previewUrl={null}
             kind="zip"
           />
         </div>
@@ -224,7 +186,6 @@ function FileSlot({
   disabled,
   percent,
   showProgress,
-  previewUrl,
   kind,
 }: {
   label: string;
@@ -235,12 +196,10 @@ function FileSlot({
   disabled: boolean;
   percent: number;
   showProgress: boolean;
-  previewUrl: string | null;
-  kind: "image" | "video" | "zip";
+  kind: "video" | "zip";
 }) {
   const inputId = `file-${kind}`;
   const icon = {
-    image: <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />,
     video: <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />,
     zip: <path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z" />,
   }[kind];
@@ -263,11 +222,6 @@ function FileSlot({
           </svg>
         </div>
       </div>
-
-      {previewUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={previewUrl} alt="" className="rounded-lg w-full h-24 object-cover border border-white/10" />
-      )}
 
       {file ? (
         <div className="text-xs text-neutral-400 truncate" title={file.name}>
