@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import Link from "next/link";
+import { HeaderNav } from "@/components/header-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,15 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 s-site
               </span>
             </Link>
-            <nav className="flex items-center gap-2">
-              <Link href="/" className="btn-ghost">Каталог</Link>
-              <Link href="/upload" className="btn-primary">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                </svg>
-                Добавить
-              </Link>
-            </nav>
+            <HeaderNav />
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-6 py-10">{children}</main>
