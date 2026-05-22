@@ -478,6 +478,7 @@ export function ItemRow({ item }: { item: Item }) {
                 src={item.play_url}
                 title={item.title}
                 allow="autoplay; fullscreen; gamepad; accelerometer; gyroscope"
+                sandbox="allow-scripts allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-modals allow-forms allow-orientation-lock"
                 className="w-full h-full rounded-xl bg-white shadow-2xl"
               />
             ) : (
@@ -487,6 +488,7 @@ export function ItemRow({ item }: { item: Item }) {
                   src={item.play_url}
                   title={item.title}
                   allow="autoplay; fullscreen; gamepad; accelerometer; gyroscope"
+                  sandbox="allow-scripts allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-modals allow-forms allow-orientation-lock"
                   className="block rounded-[1.5rem] bg-white"
                   style={{
                     width: "min(390px, calc(100vw - 32px))",
