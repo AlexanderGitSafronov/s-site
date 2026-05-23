@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME, expectedToken, timingSafeEqual } from "@/lib/auth";
 
-const PUBLIC_PREFIXES = ["/login", "/api/auth/"];
+// /play/* is public on purpose: the 16-hex slug (64 bits) is unguessable, so
+// authenticated users can hand out direct game links AND, more importantly,
+// the sandboxed play-iframe (no allow-same-origin) doesn't send cookies on
+// subresource requests — every asset would 307 to /login otherwise.
+const PUBLIC_PREFIXES = ["/login", "/api/auth/", "/play/"];
 
 const COOKIE_OPTS = {
   httpOnly: true,
