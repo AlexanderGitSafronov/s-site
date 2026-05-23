@@ -39,7 +39,9 @@ export async function GET(
   const ct = blobRes.headers.get("content-type") ?? mimeFor(relPath);
   headers.set("content-type", ct);
   headers.set("content-disposition", "inline");
-  headers.set("cache-control", "private, max-age=3600, must-revalidate");
+  // /play/* is public so Vercel's CDN can cache aggressively. Game files
+  // never change for a given slug (allowOverwrite: false on extract).
+  headers.set("cache-control", "public, max-age=3600, s-maxage=86400, immutable");
   headers.set("x-content-type-options", "nosniff");
   const etag = blobRes.headers.get("etag");
   if (etag) headers.set("etag", etag);
@@ -62,7 +64,7 @@ function forwardConditional(src: Headers): Headers {
 
 function passThroughCacheHeaders(src: Headers): Headers {
   const out = new Headers();
-  out.set("cache-control", "private, max-age=3600, must-revalidate");
+  out.set("cache-control", "public, max-age=3600, s-maxage=86400, immutable");
   const etag = src.get("etag");
   if (etag) out.set("etag", etag);
   const lm = src.get("last-modified");

@@ -3,6 +3,7 @@ import { del, list } from "@vercel/blob";
 import { sql } from "@/lib/db";
 import { isOurBlobUrl } from "@/lib/blob";
 import { badRequest, isUuid, notFound, readJson, serverError } from "@/lib/http";
+import { validatePlayPair } from "@/lib/play";
 
 export const maxDuration = 60;
 
@@ -112,21 +113,17 @@ export async function PATCH(
   if (replacingVideo && !isOurBlobUrl(body.video_url)) {
     return badRequest("video_url must be from our blob store");
   }
+
+  let newPair: { playUrl: string; playPrefix: string; slug: string } | null = null;
   if (replacingSite) {
     if (!isOurBlobUrl(body.site_url)) {
       return badRequest("site_url must be from our blob store");
     }
-    if (
-      typeof body.play_url !== "string" ||
-      !/^\/play\/[0-9a-f]{16}\/index\.html$/i.test(body.play_url)
-    ) {
-      return badRequest("play_url must be /play/<slug>/index.html");
-    }
-    if (
-      typeof body.play_prefix !== "string" ||
-      !/^play\/[0-9a-f]{16}\/$/i.test(body.play_prefix)
-    ) {
-      return badRequest("play_prefix must be play/<slug>/");
+    newPair = validatePlayPair(body.play_url, body.play_prefix);
+    if (!newPair) {
+      return badRequest(
+        "play_url and play_prefix must both be present and point to the same slug",
+      );
     }
   }
 
@@ -142,8 +139,9 @@ export async function PATCH(
   // Safety: refuse to delete the same play_prefix we're about to point to.
   if (
     replacingSite &&
+    newPair &&
     existing.play_prefix &&
-    existing.play_prefix === body.play_prefix
+    existing.play_prefix === newPair.playPrefix
   ) {
     return badRequest("new play_prefix collides with existing one");
   }
@@ -170,19 +168,17 @@ export async function PATCH(
       }
     }
 
-    if (replacingSite) {
+    if (replacingSite && newPair) {
       const siteUrl = body.site_url as string;
       const filename = asStr(body.site_filename, 500) ?? "site.zip";
       const size = asSize(body.site_size);
-      const playUrl = body.play_url as string;
-      const playPrefix = body.play_prefix as string;
       await sql`
         UPDATE items SET
           site_url = ${siteUrl},
           site_filename = ${filename},
           site_size = ${size},
-          play_url = ${playUrl},
-          play_prefix = ${playPrefix}
+          play_url = ${newPair.playUrl},
+          play_prefix = ${newPair.playPrefix}
         WHERE id = ${id}
       `;
       if (existing.site_url && existing.site_url !== siteUrl) {
@@ -190,7 +186,7 @@ export async function PATCH(
           console.error("old zip del failed", e),
         );
       }
-      if (existing.play_prefix && existing.play_prefix !== playPrefix) {
+      if (existing.play_prefix && existing.play_prefix !== newPair.playPrefix) {
         await purgePlayPrefix(existing.play_prefix).catch((e) =>
           console.error("old play prefix cleanup failed", e),
         );

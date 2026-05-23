@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { isOurBlobUrl } from "@/lib/blob";
 import { badRequest, readJson, serverError } from "@/lib/http";
+import { validatePlayPair } from "@/lib/play";
 
 const MAX_TITLE = 200;
 const MAX_DESCRIPTION = 5000;
@@ -54,18 +55,24 @@ export async function POST(req: Request) {
   if (!isOurBlobUrl(body.video_url)) return badRequest("video_url must be from our blob store");
   if (body.image_url != null && !isOurBlobUrl(body.image_url))
     return badRequest("image_url must be from our blob store");
-  // play_url is now a relative path served by our /play/[...path] proxy.
-  if (
-    body.play_url != null &&
-    !(typeof body.play_url === "string" && /^\/play\/[0-9a-f]{16}\/index\.html$/i.test(body.play_url))
-  ) {
-    return badRequest("play_url must be /play/<slug>/index.html");
+
+  // play_url + play_prefix must describe the SAME slug (or both be absent).
+  let playUrl: string | null = null;
+  let playPrefix: string | null = null;
+  if (body.play_url != null || body.play_prefix != null) {
+    const pair = validatePlayPair(body.play_url, body.play_prefix);
+    if (!pair) {
+      return badRequest(
+        "play_url and play_prefix must both be present and point to the same slug",
+      );
+    }
+    playUrl = pair.playUrl;
+    playPrefix = pair.playPrefix;
   }
 
   const site_filename = asStr(body.site_filename, 500) ?? "site.zip";
   const video_filename = asStr(body.video_filename, 500) ?? "video.mp4";
   const video_content_type = asStr(body.video_content_type, 200) ?? "video/mp4";
-  const play_prefix = asStr(body.play_prefix, 200);
 
   const image_url = isOurBlobUrl(body.image_url) ? body.image_url : null;
   const image_filename = image_url ? asStr(body.image_filename, 500) : null;
@@ -83,7 +90,7 @@ export async function POST(req: Request) {
         (${title}, ${description}, ${author}, ${body.site_url}, ${site_filename}, ${asSize(body.site_size)},
          ${body.video_url}, ${video_filename}, ${asSize(body.video_size)}, ${video_content_type},
          ${image_url}, ${image_filename}, ${image_size}, ${image_content_type},
-         ${body.play_url ?? null}, ${play_prefix})
+         ${playUrl}, ${playPrefix})
       RETURNING id
     `) as { id: string }[];
     return NextResponse.json({ id: rows[0].id });

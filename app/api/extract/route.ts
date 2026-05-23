@@ -94,8 +94,16 @@ export async function POST(req: Request) {
   try {
     await Promise.all(
       paths.map(async (raw) => {
-        const rel = stripRoot ? raw.slice(stripRoot.length) : raw;
+        let rel = stripRoot ? raw.slice(stripRoot.length) : raw;
         if (!rel || isUnsafePath(rel) || isJunkPath(rel)) return;
+        // Normalize index.html / Index.HTML / index.htm to lowercase
+        // `index.html` so the canonical play_url always works regardless
+        // of the zip's original casing.
+        const lower = rel.toLowerCase();
+        if (lower === "index.html" || lower === "index.htm") {
+          rel = "index.html";
+          indexFound = true;
+        }
         const pathname = prefix + rel;
         await put(pathname, Buffer.from(entries[raw]), {
           access: "public",
@@ -103,8 +111,6 @@ export async function POST(req: Request) {
           addRandomSuffix: false,
           allowOverwrite: false,
         });
-        const lower = rel.toLowerCase();
-        if (lower === "index.html" || lower === "index.htm") indexFound = true;
       }),
     );
   } catch (e) {
