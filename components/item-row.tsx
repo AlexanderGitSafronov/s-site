@@ -110,21 +110,7 @@ export function ItemRow({ item }: { item: Item }) {
         access: "public",
         handleUploadUrl: "/api/upload",
       });
-      setBusyLabel("Распаковка…");
-      const extractRes = await fetch("/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zipUrl: blob.url }),
-      });
-      if (!extractRes.ok) {
-        const err = await extractRes.json().catch(() => ({}));
-        throw new Error(err.error || `extract failed: ${extractRes.status}`);
-      }
-      const { playUrl, playPrefix } = (await extractRes.json()) as {
-        playUrl: string;
-        playPrefix: string;
-      };
-      setBusyLabel("Сохранение…");
+      setBusyLabel("Распаковка и сохранение…");
       const res = await fetch(`/api/items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -132,8 +118,6 @@ export function ItemRow({ item }: { item: Item }) {
           site_url: blob.url,
           site_filename: file.name,
           site_size: file.size,
-          play_url: playUrl,
-          play_prefix: playPrefix,
         }),
       });
       if (!res.ok) {

@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { isOurBlobUrl } from "@/lib/blob";
 import { badRequest, readJson, serverError } from "@/lib/http";
-import { validatePlayPair } from "@/lib/play";
+import { extractGameZip } from "@/lib/extract";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const MAX_TITLE = 200;
 const MAX_DESCRIPTION = 5000;
@@ -22,8 +25,6 @@ type Body = {
   image_filename?: unknown;
   image_size?: unknown;
   image_content_type?: unknown;
-  play_url?: unknown;
-  play_prefix?: unknown;
 };
 
 const asStr = (v: unknown, max: number): string | null =>
@@ -56,18 +57,13 @@ export async function POST(req: Request) {
   if (body.image_url != null && !isOurBlobUrl(body.image_url))
     return badRequest("image_url must be from our blob store");
 
-  // play_url + play_prefix must describe the SAME slug (or both be absent).
-  let playUrl: string | null = null;
-  let playPrefix: string | null = null;
-  if (body.play_url != null || body.play_prefix != null) {
-    const pair = validatePlayPair(body.play_url, body.play_prefix);
-    if (!pair) {
-      return badRequest(
-        "play_url and play_prefix must both be present and point to the same slug",
-      );
-    }
-    playUrl = pair.playUrl;
-    playPrefix = pair.playPrefix;
+  // Extract the uploaded zip server-side. play_url / play_prefix are
+  // derived here from a server-generated slug — the client never gets to
+  // pick them, so a bogus PATCH can't ever point a row at someone else's
+  // files (which previously caused real data loss).
+  const extract = await extractGameZip(body.site_url);
+  if (!extract.ok) {
+    return NextResponse.json({ error: extract.error }, { status: extract.status });
   }
 
   const site_filename = asStr(body.site_filename, 500) ?? "site.zip";
@@ -90,10 +86,10 @@ export async function POST(req: Request) {
         (${title}, ${description}, ${author}, ${body.site_url}, ${site_filename}, ${asSize(body.site_size)},
          ${body.video_url}, ${video_filename}, ${asSize(body.video_size)}, ${video_content_type},
          ${image_url}, ${image_filename}, ${image_size}, ${image_content_type},
-         ${playUrl}, ${playPrefix})
+         ${extract.playUrl}, ${extract.playPrefix})
       RETURNING id
     `) as { id: string }[];
-    return NextResponse.json({ id: rows[0].id });
+    return NextResponse.json({ id: rows[0].id, playUrl: extract.playUrl });
   } catch (e) {
     console.error("items insert failed", e);
     return serverError("could not save item");

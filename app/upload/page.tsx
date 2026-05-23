@@ -50,22 +50,7 @@ export default function UploadPage() {
         onUploadProgress: (e) => setProgress((p) => ({ ...p, video: e.percentage })),
       });
 
-      setStatus("Распаковка игры…");
-      const extractRes = await fetch("/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zipUrl: siteBlob.url }),
-      });
-      if (!extractRes.ok) {
-        const err = await extractRes.json().catch(() => ({}));
-        throw new Error(err.error || `extract failed: ${extractRes.status}`);
-      }
-      const { playUrl, playPrefix } = (await extractRes.json()) as {
-        playUrl: string;
-        playPrefix: string;
-      };
-
-      setStatus("Сохранение…");
+      setStatus("Распаковка и сохранение…");
       const trimmedAuthor = author.trim();
       try {
         if (trimmedAuthor) localStorage.setItem(AUTHOR_KEY, trimmedAuthor);
@@ -84,8 +69,6 @@ export default function UploadPage() {
           video_filename: videoFile.name,
           video_size: videoFile.size,
           video_content_type: videoFile.type || "video/mp4",
-          play_url: playUrl,
-          play_prefix: playPrefix,
         }),
       });
       if (!res.ok) {

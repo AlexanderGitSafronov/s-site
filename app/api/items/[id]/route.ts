@@ -3,8 +3,9 @@ import { del, list } from "@vercel/blob";
 import { sql } from "@/lib/db";
 import { isOurBlobUrl } from "@/lib/blob";
 import { badRequest, isUuid, notFound, readJson, serverError } from "@/lib/http";
-import { validatePlayPair } from "@/lib/play";
+import { extractGameZip } from "@/lib/extract";
 
+export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type ItemRow = {
@@ -73,17 +74,15 @@ export async function DELETE(
 }
 
 type PatchBody = {
-  // Video replacement
+  // Replace the video file
   video_url?: unknown;
   video_filename?: unknown;
   video_size?: unknown;
   video_content_type?: unknown;
-  // Game-zip replacement (client must call /api/extract first and pass its result)
+  // Replace the game zip — server re-extracts and derives play_url internally
   site_url?: unknown;
   site_filename?: unknown;
   site_size?: unknown;
-  play_url?: unknown;
-  play_prefix?: unknown;
 };
 
 const asStr = (v: unknown, max: number): string | null =>
@@ -109,22 +108,11 @@ export async function PATCH(
   if (!replacingVideo && !replacingSite) {
     return badRequest("nothing to update (provide video_url or site_url)");
   }
-
   if (replacingVideo && !isOurBlobUrl(body.video_url)) {
     return badRequest("video_url must be from our blob store");
   }
-
-  let newPair: { playUrl: string; playPrefix: string; slug: string } | null = null;
-  if (replacingSite) {
-    if (!isOurBlobUrl(body.site_url)) {
-      return badRequest("site_url must be from our blob store");
-    }
-    newPair = validatePlayPair(body.play_url, body.play_prefix);
-    if (!newPair) {
-      return badRequest(
-        "play_url and play_prefix must both be present and point to the same slug",
-      );
-    }
+  if (replacingSite && !isOurBlobUrl(body.site_url)) {
+    return badRequest("site_url must be from our blob store");
   }
 
   let existing: ItemRow | null;
@@ -136,14 +124,14 @@ export async function PATCH(
   }
   if (!existing) return notFound();
 
-  // Safety: refuse to delete the same play_prefix we're about to point to.
-  if (
-    replacingSite &&
-    newPair &&
-    existing.play_prefix &&
-    existing.play_prefix === newPair.playPrefix
-  ) {
-    return badRequest("new play_prefix collides with existing one");
+  // Extract BEFORE we touch the DB row, so a failed extract leaves the
+  // existing row + blobs untouched.
+  let extract: Awaited<ReturnType<typeof extractGameZip>> | null = null;
+  if (replacingSite) {
+    extract = await extractGameZip(body.site_url);
+    if (!extract.ok) {
+      return NextResponse.json({ error: extract.error }, { status: extract.status });
+    }
   }
 
   try {
@@ -160,7 +148,6 @@ export async function PATCH(
           video_content_type = ${contentType}
         WHERE id = ${id}
       `;
-      // Best-effort: delete the old blob.
       if (existing.video_url && existing.video_url !== videoUrl) {
         await del(existing.video_url).catch((e) =>
           console.error("old video del failed", e),
@@ -168,7 +155,7 @@ export async function PATCH(
       }
     }
 
-    if (replacingSite && newPair) {
+    if (replacingSite && extract && extract.ok) {
       const siteUrl = body.site_url as string;
       const filename = asStr(body.site_filename, 500) ?? "site.zip";
       const size = asSize(body.site_size);
@@ -177,8 +164,8 @@ export async function PATCH(
           site_url = ${siteUrl},
           site_filename = ${filename},
           site_size = ${size},
-          play_url = ${newPair.playUrl},
-          play_prefix = ${newPair.playPrefix}
+          play_url = ${extract.playUrl},
+          play_prefix = ${extract.playPrefix}
         WHERE id = ${id}
       `;
       if (existing.site_url && existing.site_url !== siteUrl) {
@@ -186,7 +173,7 @@ export async function PATCH(
           console.error("old zip del failed", e),
         );
       }
-      if (existing.play_prefix && existing.play_prefix !== newPair.playPrefix) {
+      if (existing.play_prefix && existing.play_prefix !== extract.playPrefix) {
         await purgePlayPrefix(existing.play_prefix).catch((e) =>
           console.error("old play prefix cleanup failed", e),
         );
